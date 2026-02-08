@@ -1,0 +1,14 @@
+{
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/.sf": true,
+    "**/.sfdx": true
+  },
+  "workbench.colorCustomizations": {
+    "activityBar.background": "#19322C",
+    "titleBar.activeBackground": "#23463D",
+    "titleBar.activeForeground": "#F6FBFA"
+  },
+  "xml.preferences.showSchemaDocumentationType": "none"
+}
