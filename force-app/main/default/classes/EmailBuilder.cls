@@ -229,22 +229,31 @@ public class EmailBuilder {
         return this;
     }
     
+    @TestVisible
+    private static String mockStaticResourceBody;
+
     /**
      * Load and process Static Resource template
      * Replaces all {{variableName}} patterns with values from templateVariables
      */
     private String processStaticResourceTemplate() {
-        List<StaticResource> resources = [
-            SELECT Body FROM StaticResource 
-            WHERE Name = :this.staticResourceName 
-            LIMIT 1
-        ];
+        String htmlContent;
         
-        if (resources.isEmpty()) {
-            throw new EmailException('Static Resource not found: ' + this.staticResourceName);
+        if (Test.isRunningTest() && mockStaticResourceBody != null) {
+            htmlContent = mockStaticResourceBody;
+        } else {
+            List<StaticResource> resources = [
+                SELECT Body FROM StaticResource 
+                WHERE Name = :this.staticResourceName 
+                LIMIT 1
+            ];
+            
+            if (resources.isEmpty()) {
+                throw new EmailException('Static Resource not found: ' + this.staticResourceName);
+            }
+            
+            htmlContent = resources[0].Body.toString();
         }
-        
-        String htmlContent = resources[0].Body.toString();
         
         // Replace all {{variableName}} patterns
         for (String varName : this.templateVariables.keySet()) {
