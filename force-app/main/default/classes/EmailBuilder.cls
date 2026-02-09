@@ -198,6 +198,16 @@ public class EmailBuilder {
         this.attachments.add(new EmailAttachment().contentVersionId(contentVersionId));
         return this;
     }
+
+    /**
+     * Add multiple attachments from ContentVersion Ids
+     */
+    public EmailBuilder attachContentVersions(List<Id> contentVersionIds) {
+        for (Id cvId : contentVersionIds) {
+            this.attachments.add(new EmailAttachment().contentVersionId(cvId));
+        }
+        return this;
+    }
     
     /**
      * Add a tag for tracking
@@ -289,9 +299,10 @@ public class EmailBuilder {
     }
     
     /**
-     * Build and send the email
+     * Build the email message without sending
+     * Useful for bulk sending when you need to send multiple emails in one transaction
      */
-    public EmailResult send() {
+    public Messaging.SingleEmailMessage build() {
         validate();
         
         Messaging.SingleEmailMessage email = new Messaging.SingleEmailMessage();
@@ -363,6 +374,33 @@ public class EmailBuilder {
         
         // Handle attachments
         if (!this.attachments.isEmpty()) {
+            
+            // Optimization: Pre-load all ContentVersion attachments in one query
+            Set<Id> cvIdsToQuery = new Set<Id>();
+            List<EmailAttachment> cvAttachments = new List<EmailAttachment>();
+            
+            for (EmailAttachment att : this.attachments) {
+                if (att.getContentVersionId() != null) {
+                    cvIdsToQuery.add(att.getContentVersionId());
+                    cvAttachments.add(att);
+                }
+            }
+            
+            if (!cvIdsToQuery.isEmpty()) {
+                Map<Id, ContentVersion> cvMap = new Map<Id, ContentVersion>([
+                    SELECT VersionData, Title, FileExtension, ContentSize 
+                    FROM ContentVersion 
+                    WHERE Id IN :cvIdsToQuery
+                ]);
+                
+                // Inject loaded records back into attachments
+                for (EmailAttachment att : cvAttachments) {
+                    if (cvMap.containsKey(att.getContentVersionId())) {
+                        att.setContentVersionSObject(cvMap.get(att.getContentVersionId()));
+                    }
+                }
+            }
+
             List<Messaging.EmailFileAttachment> fileAttachments = new List<Messaging.EmailFileAttachment>();
             
             for (EmailAttachment att : this.attachments) {
@@ -374,6 +412,15 @@ public class EmailBuilder {
         
         // Save as activity
         email.setSaveAsActivity(this.saveAsActivity);
+        
+        return email;
+    }
+
+    /**
+     * Build and send the email
+     */
+    public EmailResult send() {
+        Messaging.SingleEmailMessage email = build();
         
         // Send the email
         try {

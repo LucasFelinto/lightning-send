@@ -18,6 +18,7 @@ LSend.emails()
 ## 📦 Installation
 
 Deploy the following classes to your org:
+
 - `LSend.cls`
 - `EmailBuilder.cls`
 - `EmailAttachment.cls`
@@ -123,6 +124,16 @@ LSend.emails()
     .attachContentVersion(contentVersionId)
     .send();
 
+// From List of ContentVersions (Optimized for Bulk)
+List<Id> contentVersionIds = new List<Id>{'068...', '068...'};
+
+LSend.emails()
+    .to('user@example.com')
+    .subject('Multiple Documents')
+    .html('<p>Documents attached.</p>')
+    .attachContentVersions(contentVersionIds)
+    .send();
+
 // Using EmailAttachment class
 EmailAttachment att = new EmailAttachment()
     .filename('report.xlsx')
@@ -168,19 +179,21 @@ Create an HTML file as a Static Resource with `{{variableName}}` placeholders:
 > `System.StringException: BLOB is not a valid UTF-8 string`
 
 **Static Resource: `WelcomeEmailTemplate`**
+
 ```html
 <!DOCTYPE html>
 <html>
-<body>
+  <body>
     <h1>Welcome, {{firstName}}!</h1>
     <p>Thank you for joining {{companyName}}.</p>
     <p>Your account is now active.</p>
     <a href="{{loginUrl}}">Login Now</a>
-</body>
+  </body>
 </html>
 ```
 
 **Apex Usage:**
+
 ```apex
 LSend.emails()
     .sender('noreply@company.com')
@@ -195,6 +208,7 @@ LSend.emails()
 ```
 
 **Order Confirmation Example:**
+
 ```apex
 LSend.emails()
     .sender('orders@company.com')
@@ -265,60 +279,83 @@ try {
 }
 ```
 
+### Bulk Sending (Avoid Governor Limits)
+
+To avoid hitting the 10 `sendEmail` calls per transaction limit, use the `.build()` method to create `Messaging.SingleEmailMessage` objects and send them in a single batch.
+
+```apex
+List<Messaging.SingleEmailMessage> emails = new List<Messaging.SingleEmailMessage>();
+
+for (Contact c : contacts) {
+    emails.add(
+        LSend.emails()
+            .sender('newsletter@company.com')
+            .to(c.Email)
+            .subject('Monthly Update')
+            .html('<p>Hello ' + c.FirstName + '</p>')
+            .build() // crucial: build without sending
+    );
+}
+
+// Send all at once (consumes only 1 invocation)
+Messaging.sendEmail(emails);
+```
+
 ## 📚 API Reference
 
 ### LSend
 
-| Method | Description |
-|--------|-------------|
+| Method     | Description                      |
+| ---------- | -------------------------------- |
 | `emails()` | Returns an EmailBuilder instance |
 
 ### EmailBuilder
 
-| Method | Parameters | Description |
-|--------|------------|-------------|
-| `sender()` | `String senderEmail` | Set sender (supports "Name \<email\>" format) |
-| `to()` | `String recipient` | Add single recipient |
-| `to()` | `List<String> recipients` | Add multiple recipients |
-| `cc()` | `String/List<String>` | Add CC recipients |
-| `bcc()` | `String/List<String>` | Add BCC recipients |
-| `replyTo()` | `String email` | Set reply-to address |
-| `subject()` | `String subject` | Set email subject |
-| `html()` | `String content` | Set HTML body |
-| `text()` | `String content` | Set plain text body |
-| `staticResource()` | `String resourceName` | Use HTML template from Static Resource |
-| `template()` | `String devName` | Use Salesforce template by developer name |
-| `templateId()` | `Id templateId` | Use Salesforce template by Id |
-| `targetObject()` | `Id objectId` | Set target object for template merge |
-| `whatObject()` | `Id objectId` | Set what object for template merge |
-| `variable()` | `String name, String value` | Add `{{variable}}` replacement |
-| `variables()` | `Map<String, String>` | Add multiple variables |
-| `attach()` | `String filename, Blob content` | Add attachment from Blob |
-| `attach()` | `EmailAttachment attachment` | Add attachment object |
-| `attachContentVersion()` | `Id contentVersionId` | Add attachment from CV |
-| `tag()` | `String name, String value` | Add tracking tag |
-| `saveActivity()` | `Boolean save` | Save email as activity |
-| `send()` | - | Send the email |
+| Method                    | Parameters                      | Description                                   |
+| ------------------------- | ------------------------------- | --------------------------------------------- |
+| `sender()`                | `String senderEmail`            | Set sender (supports "Name \<email\>" format) |
+| `to()`                    | `String recipient`              | Add single recipient                          |
+| `to()`                    | `List<String> recipients`       | Add multiple recipients                       |
+| `cc()`                    | `String/List<String>`           | Add CC recipients                             |
+| `bcc()`                   | `String/List<String>`           | Add BCC recipients                            |
+| `replyTo()`               | `String email`                  | Set reply-to address                          |
+| `subject()`               | `String subject`                | Set email subject                             |
+| `html()`                  | `String content`                | Set HTML body                                 |
+| `text()`                  | `String content`                | Set plain text body                           |
+| `staticResource()`        | `String resourceName`           | Use HTML template from Static Resource        |
+| `template()`              | `String devName`                | Use Salesforce template by developer name     |
+| `templateId()`            | `Id templateId`                 | Use Salesforce template by Id                 |
+| `targetObject()`          | `Id objectId`                   | Set target object for template merge          |
+| `whatObject()`            | `Id objectId`                   | Set what object for template merge            |
+| `variable()`              | `String name, String value`     | Add `{{variable}}` replacement                |
+| `variables()`             | `Map<String, String>`           | Add multiple variables                        |
+| `attach()`                | `String filename, Blob content` | Add attachment from Blob                      |
+| `attach()`                | `EmailAttachment attachment`    | Add attachment object                         |
+| `attachContentVersion()`  | `Id contentVersionId`           | Add attachment from CV                        |
+| `attachContentVersions()` | `List<Id> contentVersionIds`    | Add multiple attachments from CVs (Optimized) |
+| `tag()`                   | `String name, String value`     | Add tracking tag                              |
+| `saveActivity()`          | `Boolean save`                  | Save email as activity                        |
+| `send()`                  | -                               | Send the email                                |
 
 ### EmailAttachment
 
-| Method | Description |
-|--------|-------------|
-| `filename()` | Set the filename |
-| `content()` | Set content from Blob |
-| `contentType()` | Set MIME type |
+| Method               | Description             |
+| -------------------- | ----------------------- |
+| `filename()`         | Set the filename        |
+| `content()`          | Set content from Blob   |
+| `contentType()`      | Set MIME type           |
 | `contentVersionId()` | Set from ContentVersion |
 
 ### EmailResult
 
-| Property/Method | Description |
-|-----------------|-------------|
-| `success` | Boolean - was email sent |
-| `error` | String - error message if failed |
-| `id` | String - tracking ID |
-| `isSuccess()` | Check if successful |
-| `getError()` | Get error message |
-| `getId()` | Get tracking ID |
+| Property/Method | Description                      |
+| --------------- | -------------------------------- |
+| `success`       | Boolean - was email sent         |
+| `error`         | String - error message if failed |
+| `id`            | String - tracking ID             |
+| `isSuccess()`   | Check if successful              |
+| `getError()`    | Get error message                |
+| `getId()`       | Get tracking ID                  |
 
 ## ⚠️ Salesforce Limits
 

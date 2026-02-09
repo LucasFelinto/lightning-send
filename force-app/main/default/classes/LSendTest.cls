@@ -274,6 +274,44 @@ private class LSendTest {
     }
 
     @isTest
+    static void testMultipleContentVersionAttachments() {
+        // Create 2 ContentVersions
+        List<ContentVersion> cvs = new List<ContentVersion>();
+        for(Integer i=0; i<2; i++) {
+            ContentVersion cv = new ContentVersion();
+            cv.Title = 'Test Document ' + i;
+            cv.PathOnClient = 'TestDocument' + i + '.pdf';
+            cv.VersionData = Blob.valueOf('Test Content Data ' + i);
+            cv.IsMajorVersion = true;
+            cvs.add(cv);
+        }
+        insert cvs;
+        
+        List<Id> cvIds = new List<Id>();
+        for(ContentVersion cv : [SELECT Id FROM ContentVersion]) {
+            cvIds.add(cv.Id);
+        }
+        
+        Test.startTest();
+        
+        EmailBuilder builder = LSend.emails()
+            .sender('test@example.com')
+            .to('user@example.com')
+            .subject('Test Multiple CV Attachments')
+            .html('<p>See attached</p>')
+            .attachContentVersions(cvIds);
+            
+        // Trigger build() which should run the bulk query
+        Messaging.SingleEmailMessage email = builder.build();
+        
+        Test.stopTest();
+        
+        System.assertEquals(2, email.getFileAttachments().size(), 'Should have 2 attachments');
+        // Order is not guaranteed by set/map, so we just check size and maybe content existence, 
+        // but for this test size is enough to prove query didn't fail and attachments were created.
+    }
+
+    @isTest
     static void testEmailTemplate() {
         // Create a user to run as (to ensure current user has permissions)
         User currentUser = [SELECT Id FROM User WHERE Id = :UserInfo.getUserId()];
@@ -479,5 +517,33 @@ private class LSendTest {
         }
         
         Test.stopTest();
+    }
+
+    @IsTest
+    static void testBulkSending() {
+        // Create 5 emails (to test bulk without hitting org limits which might be low like 15)
+        List<Messaging.SingleEmailMessage> emails = new List<Messaging.SingleEmailMessage>();
+        
+        for (Integer i = 0; i < 5; i++) {
+            emails.add(
+                LSend.emails()
+                    .sender('noreply@company.com')
+                    .to('user' + i + '@example.com')
+                    .subject('Bulk Test ' + i)
+                    .html('<p>Body</p>')
+                    .build()
+            );
+        }
+        
+        Test.startTest();
+        // Standard Salesforce way to send bulk
+        Messaging.sendEmail(emails);
+        
+        // Check limits - should be 1 invocation
+        Integer invocations = Limits.getEmailInvocations();
+        Test.stopTest();
+        
+        System.assertEquals(1, invocations, 'Should only use 1 email invocation for list send');
+        System.assertEquals(5, emails.size(), 'Should have built 5 emails');
     }
 }

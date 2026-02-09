@@ -40,13 +40,33 @@ public class EmailAttachment {
         return this;
     }
     
+    private ContentVersion cvRecord;
+
+    /**
+     * Get the ContentVersion Id
+     */
+    public Id getContentVersionId() {
+        return this.cvId;
+    }
+
+    /**
+     * Set the ContentVersion record directly (for bulkification)
+     */
+    public void setContentVersionSObject(ContentVersion cv) {
+        this.cvRecord = cv;
+    }
+    
     /**
      * Convert to Salesforce EmailFileAttachment
      */
     public Messaging.EmailFileAttachment toEmailFileAttachment() {
         Messaging.EmailFileAttachment attachment = new Messaging.EmailFileAttachment();
         
-        if (this.cvId != null) {
+        if (this.cvRecord != null) {
+            // Use pre-loaded record
+            attachment.setFileName(this.cvRecord.Title + '.' + this.cvRecord.FileExtension);
+            attachment.setBody(this.cvRecord.VersionData);
+        } else if (this.cvId != null) {
             // Load from ContentVersion
             ContentVersion cv = [
                 SELECT VersionData, Title, FileExtension, ContentSize 
