@@ -3,7 +3,7 @@
  * 
  * Provides a chainable API similar to modern email services
  */
-public class EmailBuilder {
+public with sharing class EmailBuilder {
     
     private String fromAddress;
     private String fromName;
@@ -252,6 +252,10 @@ public class EmailBuilder {
         if (Test.isRunningTest() && mockStaticResourceBody != null) {
             htmlContent = mockStaticResourceBody;
         } else {
+            if (!Schema.sObjectType.StaticResource.isAccessible()) {
+                throw new EmailException('StaticResource object is not accessible in this context');
+            }
+
             List<StaticResource> resources = [
                 SELECT Body FROM StaticResource 
                 WHERE Name = :this.staticResourceName 
@@ -290,7 +294,7 @@ public class EmailBuilder {
         if (this.toAddresses.isEmpty()) {
             throw new EmailException('At least one recipient (to) is required');
         }
-        
+    
         if (String.isBlank(this.htmlBody) && String.isBlank(this.textBody) && 
             String.isBlank(this.templateName) && this.templateId == null &&
             String.isBlank(this.staticResourceName)) {
@@ -339,6 +343,10 @@ public class EmailBuilder {
             // Use Salesforce Email Template
             Id tempId = this.templateId;
             if (tempId == null && String.isNotBlank(this.templateName)) {
+                if (!Schema.sObjectType.EmailTemplate.isAccessible()) {
+                    throw new EmailException('EmailTemplate object is not accessible in this context');
+                }
+
                 List<EmailTemplate> templates = [
                     SELECT Id FROM EmailTemplate 
                     WHERE DeveloperName = :this.templateName 
@@ -387,6 +395,10 @@ public class EmailBuilder {
             }
             
             if (!cvIdsToQuery.isEmpty()) {
+                if (!Schema.sObjectType.ContentVersion.isAccessible()) {
+                    throw new EmailException('ContentVersion object is not accessible in this context');
+                }
+
                 Map<Id, ContentVersion> cvMap = new Map<Id, ContentVersion>([
                     SELECT VersionData, Title, FileExtension, ContentSize 
                     FROM ContentVersion 

@@ -1,7 +1,7 @@
 /**
  * EmailAttachment - Fluent wrapper for email attachments
  */
-public class EmailAttachment {
+public with sharing class EmailAttachment {
     
     private String name;
     private Blob body;
@@ -67,6 +67,10 @@ public class EmailAttachment {
             attachment.setFileName(this.cvRecord.Title + '.' + this.cvRecord.FileExtension);
             attachment.setBody(this.cvRecord.VersionData);
         } else if (this.cvId != null) {
+            if (!Schema.sObjectType.ContentVersion.isAccessible()) {
+                throw new EmailException('ContentVersion object is not accessible in this context');
+            }
+
             // Load from ContentVersion
             ContentVersion cv = [
                 SELECT VersionData, Title, FileExtension, ContentSize 
